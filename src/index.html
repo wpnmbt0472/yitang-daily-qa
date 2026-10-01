@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+<title>每日问答</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ======================= 侧栏 ======================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">问</div>
+      <div class="brand-text">
+        <b>每日问答</b>
+        <span>把知识变成判断力</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item is-active" data-view="daily">
+        <span class="nav-ico">✎</span><span>每日问答</span>
+      </button>
+      <button class="nav-item" data-view="stats">
+        <span class="nav-ico">▤</span><span>学习统计</span>
+      </button>
+      <button class="nav-item" data-view="achv">
+        <span class="nav-ico">★</span><span>成就记录</span>
+      </button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="sync-chip" id="syncChip"><i class="dot"></i><span id="syncChipText">飞书未配置</span></div>
+      <button class="btn-link" id="btnSettings">设置</button>
+    </div>
+  </aside>
+
+  <!-- ======================= 主区 ======================= -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1 id="viewTitle">今日问答</h1>
+        <p id="viewSub">读完不一定记住，答对才算拿到</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn ghost" id="btnSync">同步飞书</button>
+        <button class="btn primary" id="btnPrimary">开始答题</button>
+      </div>
+    </header>
+
+    <div class="scroll">
+
+      <!-- ---------- 视图 1：每日问答 ---------- -->
+      <section class="view" id="view-daily">
+        <div class="hero card">
+          <div class="hero-left">
+            <div class="hero-eyebrow">今日进度</div>
+            <div class="hero-num"><span id="todayAnswered">0</span><em>/<span id="todayTotal">5</span></em></div>
+            <div class="hero-hint" id="todayHint">今天还没开始，先答一题热热身</div>
+          </div>
+          <div class="hero-right">
+            <div class="tiles">
+              <div class="tile">
+                <div class="tile-k">连续打卡</div>
+                <div class="tile-v"><span id="mStreak">0</span><i>天</i></div>
+              </div>
+              <div class="tile">
+                <div class="tile-k">平均正确率</div>
+                <div class="tile-v"><span id="mAcc">0</span><i>%</i></div>
+              </div>
+              <div class="tile">
+                <div class="tile-k">本月活跃</div>
+                <div class="tile-v"><span id="mMonth">0</span><i>天</i></div>
+              </div>
+              <div class="tile">
+                <div class="tile-k">30天答对</div>
+                <div class="tile-v"><span id="mCorrect">0</span><i>题</i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>今日题目</h2>
+              <p class="muted" id="todayMeta">共 5 题</p>
+            </div>
+            <div class="pager" id="qPager"></div>
+          </div>
+          <div id="questionList" class="q-list"></div>
+        </div>
+      </section>
+
+      <!-- ---------- 视图 2：学习统计 ---------- -->
+      <section class="view is-hidden" id="view-stats">
+        <div class="kpis">
+          <div class="card kpi"><div class="kpi-k">30天答题总数</div><div class="kpi-v" id="kTotal">0<i>题</i></div></div>
+          <div class="card kpi"><div class="kpi-k">平均正确率</div><div class="kpi-v" id="kAcc">0<i>%</i></div></div>
+          <div class="card kpi"><div class="kpi-k">累计学习时长</div><div class="kpi-v" id="kMin">0<i>分钟</i></div></div>
+          <div class="card kpi"><div class="kpi-k">活跃天数</div><div class="kpi-v" id="kDays">0<i>天</i></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h2>每日答题量</h2><p class="muted" id="barRange">过去 30 天</p></div>
+            <div class="legend"><i class="sw sw-bar"></i>答题数</div>
+          </div>
+          <div class="chart-wrap"><svg id="barChart" class="chart" viewBox="0 0 760 220" preserveAspectRatio="none"></svg></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><div><h2>活跃热力图</h2><p class="muted">颜色越深，当天答得越多</p></div></div>
+            <div id="heatmap" class="heatmap"></div>
+            <div class="heat-legend"><span>少</span><i class="h0"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i><span>多</span></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div><h2>正确率趋势</h2><p class="muted">按周汇总（近 30 天）</p></div></div>
+            <div class="chart-wrap"><svg id="lineChart" class="chart" viewBox="0 0 420 200" preserveAspectRatio="none"></svg></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 视图 3：成就记录 ---------- -->
+      <section class="view is-hidden" id="view-achv">
+        <div class="card achv-head">
+          <div class="achv-medal">🏅</div>
+          <div>
+            <h2 id="achvTitle">成就进度</h2>
+            <p class="muted" id="achvSub">已解锁 0 / 8</p>
+          </div>
+          <div class="achv-bar"><span id="achvBar"></span></div>
+        </div>
+        <div class="achv-grid" id="achvGrid"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ======================= 设置弹窗 ======================= -->
+<div class="modal is-hidden" id="settingsModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>设置</h3>
+      <button class="btn-link" id="btnCloseSettings">关闭</button>
+    </div>
+
+    <div class="modal-body">
+      <h4>飞书同步（多维表格）</h4>
+      <p class="muted small">
+        在飞书开放平台建一个<b>自建应用</b>，开通 <code>bitable:app</code> 权限并发布，
+        把「多维表格」的 app_token 与 table_id 填进来即可。填写后每日答题记录会自动写入同一张表。
+      </p>
+      <label class="switch">
+        <input type="checkbox" id="fsEnabled" />
+        <span>启用飞书同步</span>
+      </label>
+      <div class="form-grid">
+        <label>App ID<input id="fsAppId" placeholder="cli_xxxxxxxxxxxx" /></label>
+        <label>App Secret<input id="fsAppSecret" type="password" placeholder="留空表示不修改" /></label>
+        <label>app_token<input id="fsAppToken" placeholder="多维表格 URL 里的 bascnXXXX" /></label>
+        <label>table_id<input id="fsTableId" placeholder="tblXXXXXXXX" /></label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="btnTestFeishu">测试连接</button>
+        <button class="btn primary" id="btnSaveFeishu">保存</button>
+      </div>
+
+      <div class="danger-zone">
+        <h4>本地数据</h4>
+        <p class="muted small" id="dataPath">数据目录：—</p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="btnOpenDir">打开数据目录</button>
+          <button class="btn danger" id="btnReset">重新生成这 30 天数据</button>
+        </div>
+      </div>
+
+      <p class="muted small" id="envLine"></p>
+    </div>
+  </div>
+</div>
+
+<div class="toast is-hidden" id="toast"></div>
+
+<script src="browser-mock.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

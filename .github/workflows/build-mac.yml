@@ -34,11 +34,15 @@ jobs:
         run: npm run icon
 
       - name: 打包 macOS（arm64 + x64）
-        run: npx electron-builder --mac --arm64 --x64
+        # --publish never 必须加：electron-builder 在 CI 里会触发「隐式发布」，
+        # 要求 GH_TOKEN，拿不到就 exit 1（产物其实已经全部打好了）。
+        # 我们用自己的 upload-artifact / Release 步骤，不需要它出面。
+        run: npx electron-builder --mac --arm64 --x64 --publish never
         env:
           # 没有 Apple 开发者证书时，明确告知 electron-builder 不要去找证书，
           # 否则会因为找不到签名身份而报错中断。
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 上传产物（Artifacts）
         uses: actions/upload-artifact@v4

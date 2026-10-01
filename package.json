@@ -1,0 +1,84 @@
+{
+  "name": "yitang-daily-qa",
+  "version": "0.1.0",
+  "description": "每日问答 · 学习统计 · 成就记录（桌面端）",
+  "author": "王鹏 <yitang>",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron scripts/smoke.js",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:mac:all": "electron-builder --mac --arm64 --x64",
+    "dist:win": "electron-builder --win",
+    "icon": "node scripts/make-icon.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "top.yitang.dailyqa",
+    "productName": "YitangDaily",
+    "copyright": "Copyright © 2026 王鹏",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "darkModeSupport": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSHumanReadableCopyright": "Copyright © 2026 王鹏",
+        "LSApplicationCategoryType": "public.app-category.productivity"
+      }
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        { "x": 150, "y": 200, "type": "file" },
+        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": ["AppImage"],
+      "category": "Utility"
+    }
+  }
+}

@@ -1,0 +1,109 @@
+name: build
+
+# 触发方式：
+#   1) 仓库页面 → Actions → build → Run workflow（手动，最常用）
+#   2) 推一个 v* 标签 → 自动构建并创建 Release，把 dmg 与 exe 一起挂上去
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------- macOS
+  # macos-14 = Apple Silicon(M1) runner。同一台机器上可以同时产出
+  # arm64 与 x64 两份包（--arm64 --x64），所以不需要两台 runner。
+  mac:
+    runs-on: macos-14
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 生成图标
+        run: npm run icon
+
+      - name: 打包 macOS（arm64 + x64）
+        # --publish never 必须加：electron-builder 在 CI 里会触发「隐式发布」，
+        # 拿不到 GH_TOKEN 就 exit 1（产物其实已经全部打好了）。
+        run: npx electron-builder --mac --arm64 --x64 --publish never
+        env:
+          # 没有 Apple 开发者证书时，明确告知不要去找证书，否则会因找不到签名身份而中断
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传产物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: yitang-daily-mac
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
+  # ---------------------------------------------------------------- Windows
+  win:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 生成图标
+        run: npm run icon
+
+      - name: 打包 Windows（免安装版 + 安装版）
+        # 同样要 --publish never，理由同 mac job
+        run: npx electron-builder --win --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传产物（Artifacts）
+        uses: actions/upload-artifact@v4
+        with:
+          name: yitang-daily-win
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*.exe
+
+  # ---------------------------------------------------------------- 发布
+  # 只有打 tag 推送时才跑：把上面两个 job 的产物合并到一个 Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [mac, win]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载全部产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 列出待发布内容
+        run: find artifacts -type f | sed 's/^/  /'
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe

@@ -98,7 +98,7 @@ npm run dist:win   # 出个 Windows exe，功能完全一致，可先验收交�
 
 ## 4. 路线 B：GitHub Actions 自动出包（零 Mac，推荐）
 
-工作流文件已经写好：`.github/workflows/build-mac.yml`。
+工作流文件已经写好：`.github/workflows/build.yml`。
 
 ### 4.1 一次性配置
 
@@ -116,7 +116,7 @@ gh repo create yitang-daily-qa --private --source=. --push
 
 两种触发方式：
 
-- **手动**：仓库页面 → `Actions` → 左侧 `build-mac` → `Run workflow`。
+- **手动**：仓库页面 → `Actions` → 左侧 `build` → `Run workflow`。
 - **自动**：打标签推送，会同时创建 Release 并把 dmg 挂上去。
   ```bash
   git tag v0.1.0 && git push origin v0.1.0
@@ -238,7 +238,7 @@ yitang-daily-qa/
 │   ├── make-icon.js                 # 零依赖生成 1024×1024 图标（SDF 逐像素绘制）
 │   └── smoke.js                     # 端到端冒烟测试（无界面跑通全部链路）
 ├── build/entitlements.mac.plist     # Hardened Runtime 权限声明
-└── .github/workflows/build-mac.yml  # macOS CI 构建流水线
+└── .github/workflows/build.yml  # macOS CI 构建流水线
 ```
 
 **数据落在哪**：`app.getPath('userData')` → macOS 上是
@@ -320,16 +320,39 @@ npm run smoke
 
 ---
 
-## 12. 下一步
+## 12. 出 Windows 版（本机直接就能打）
+
+macOS 包要靠 CI，但 **Windows 包在这台机器上一条命令就出**，不用等 CI、不用任何签名。
 
 ```bash
-# 在本机先跑起来看效果（Windows 也能跑）
+npm run dist:win
+```
+
+产物在 `dist/`，一次出**两种**，按需取用：
+
+| 文件 | 形态 | 适合 |
+|---|---|---|
+| `YitangDaily 0.1.0.exe` | **免安装版（portable）** | 双击直接运行，不写注册表、不需要管理员。拷给别人或放 U 盘都能用 |
+| `YitangDaily Setup 0.1.0.exe` | 安装版（NSIS） | 走安装向导，可改安装目录，会建开始菜单快捷方式 |
+| `win-unpacked/` | 未打包目录 | 调试用，里面有可直接双击的 `YitangDaily.exe` |
+
+**首次打开会被 SmartScreen 拦一下**（未签名程序的正常表现）：
+弹窗点 **更多信息** → **仍要运行** 即可，之后不再提示。
+想彻底没有提示，需要买代码签名证书（OV/EV）并用 `signtool` 签名，年费通常一两千元起——
+自用或内部小范围分发没必要。
+
+---
+
+## 13. 下一步
+
+```bash
+# 在本机先跑起来看效果
 npm start
 
 # 无界面自检：答题链路 + 三视图 + 设置弹窗，全绿再打包
 npm run smoke
 
-# 出 Windows 版先验收交互
+# 出 Windows 版（本机直接出，2~3 分钟）
 npm run dist:win
 ```
 

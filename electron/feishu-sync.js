@@ -73,7 +73,59 @@ function toRecordFields(day, dateKeyStr, streak, cfg) {
   return fields;
 }
 
-/** 写入（或更新）指定日期的一行 */
+/**
+ * 找出该日期已存在的记录 id（找不到就返回 null）
+ *
+ * 为什么要这步：飞书多维表格的写入接口只有「新增」，没有「按条件覆盖」。
+ * 如果同一天点两次同步，就会写进两行重复记录。
+ * 所以先按「日期」列在本地比对一遍已有记录，能对上就改成更新那一条。
+ *
+ * 注意：日期字段读回来可能是毫秒时间戳、ISO 字符串、或 {value:...} 包装，
+ * 这里全部兼容；比对用「同一天」容差，避免时区解释差异导致匹配失败。
+ * 任何一步失败都返回 null —— 退化成原来的「新增」行为，不会更糟。
+ */
+async function findRecordIdByDate({ dateKeyStr, config, token }) {
+  const f = Object.assign({}, DEFAULT_FIELDS, (config.feishu && config.feishu.fields) || {});
+  const dateField = f.date;
+  const [y, m, d] = dateKeyStr.split('-').map(Number);
+  const ts = Date.UTC(y, m - 1, d);
+  const appToken = encodeURIComponent(config.feishu.appToken);
+  const tableId = encodeURIComponent(config.feishu.tableId);
+
+  let pageToken = '';
+  for (let page = 0; page < 10; page++) {
+    const url = `${BASE}/bitable/v1/apps/${appToken}/tables/${tableId}/records`
+      + `?page_size=500${pageToken ? '&page_token=' + encodeURIComponent(pageToken) : ''}`;
+    let r;
+    try {
+      r = await req(url, { method: 'GET', headers: { Authorization: `Bearer ${token}` } });
+    } catch (_) { return null; }
+
+    const j = r.json || {};
+    if (j.code !== 0) return null;
+    const items = (j.data && j.data.items) || [];
+
+    for (const it of items) {
+      const v = it.fields && it.fields[dateField];
+      if (v === undefined || v === null) continue;
+      let n = null;
+      if (typeof v === 'number') n = v;
+      else if (typeof v === 'string') { const p = Date.parse(v); if (!Number.isNaN(p)) n = p; }
+      else if (Array.isArray(v) && typeof v[0] === 'number') n = v[0];
+      else if (typeof v === 'object' && typeof v.value === 'number') n = v.value;
+      if (n !== null && Math.abs(n - ts) < 86400000) return it.record_id;
+    }
+
+    if (!j.data || !j.data.has_more || !j.data.page_token) break;
+    pageToken = j.data.page_token;
+  }
+  return null;
+}
+
+/**
+ * 写入指定日期的一行：当天已有记录就更新，没有才新建。
+ * 返回值里的 mode 标明这次是 'created' 还是 'updated'。
+ */
 async function pushDay({ dateKeyStr, day, streak, config }) {
   if (!hasCredentials(config)) {
     return { ok: false, reason: '未配置飞书应用凭据', detail: '请在 App 内「设置 → 飞书同步」填入 App ID / App Secret / app_token / table_id' };
@@ -81,20 +133,29 @@ async function pushDay({ dateKeyStr, day, streak, config }) {
   try {
     const token = await getTenantToken(config);
     const fields = toRecordFields(day, dateKeyStr, streak, config);
-    const url = `${BASE}/bitable/v1/apps/${encodeURIComponent(config.feishu.appToken)}/tables/${encodeURIComponent(config.feishu.tableId)}/records`;
-    const r = await req(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ fields })
-    });
+    const base = `${BASE}/bitable/v1/apps/${encodeURIComponent(config.feishu.appToken)}/tables/${encodeURIComponent(config.feishu.tableId)}/records`;
+    const headers = { 'Content-Type': 'application/json; charset=utf-8', Authorization: `Bearer ${token}` };
+
+    // 先查当天是否已有记录
+    const existingId = await findRecordIdByDate({ dateKeyStr, config, token });
+
+    if (existingId) {
+      const r = await req(`${base}/${encodeURIComponent(existingId)}`, {
+        method: 'PUT', headers, body: JSON.stringify({ fields })
+      });
+      const j = r.json || {};
+      if (j.code !== 0) {
+        return { ok: false, reason: `更新失败 code=${j.code}`, detail: j.msg || r.text.slice(0, 300) };
+      }
+      return { ok: true, mode: 'updated', recordId: existingId, fields };
+    }
+
+    const r = await req(base, { method: 'POST', headers, body: JSON.stringify({ fields }) });
     const j = r.json || {};
     if (j.code !== 0) {
       return { ok: false, reason: `写入失败 code=${j.code}`, detail: j.msg || r.text.slice(0, 300) };
     }
-    return { ok: true, recordId: (j.data && j.data.record && j.data.record.record_id) || '', fields };
+    return { ok: true, mode: 'created', recordId: (j.data && j.data.record && j.data.record.record_id) || '', fields };
   } catch (e) {
     return { ok: false, reason: '网络或鉴权异常', detail: String(e.message || e) };
   }

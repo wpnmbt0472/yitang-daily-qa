@@ -80,8 +80,15 @@ function toRecordFields(day, dateKeyStr, streak, cfg) {
  * 如果同一天点两次同步，就会写进两行重复记录。
  * 所以先按「日期」列在本地比对一遍已有记录，能对上就改成更新那一条。
  *
- * 注意：日期字段读回来可能是毫秒时间戳、ISO 字符串、或 {value:...} 包装，
- * 这里全部兼容；比对用「同一天」容差，避免时区解释差异导致匹配失败。
+ * 注意：日期字段读回来可能是毫秒时间戳、ISO 字符串、或 {value:...} 包装，这里全部兼容。
+ *
+ * 比对规则（很关键，别改错）：只接受两种差值 ——
+ *   a) 完全相同（0）；或
+ *   b) 差距是**整小时**且不超过 14 小时（覆盖各种时区解释偏移）。
+ * 为什么不直接写「差值 < 一天」——那样「前一天 23:59」这类邻近值也会被算成同一天，
+ * 会把昨天那行覆盖掉。而真实的日期字段只会存某个时区的 00:00，
+ * 所以差值要么是 0，要么是整小时的时区偏移。
+ *
  * 任何一步失败都返回 null —— 退化成原来的「新增」行为，不会更糟。
  */
 async function findRecordIdByDate({ dateKeyStr, config, token }) {
@@ -113,7 +120,13 @@ async function findRecordIdByDate({ dateKeyStr, config, token }) {
       else if (typeof v === 'string') { const p = Date.parse(v); if (!Number.isNaN(p)) n = p; }
       else if (Array.isArray(v) && typeof v[0] === 'number') n = v[0];
       else if (typeof v === 'object' && typeof v.value === 'number') n = v.value;
-      if (n !== null && Math.abs(n - ts) < 86400000) return it.record_id;
+
+      if (n !== null) {
+        const diff = Math.abs(n - ts);
+        const exact = diff === 0;
+        const tzShift = diff % 3600000 === 0 && diff <= 14 * 3600000; // 整小时且 ≤14h
+        if (exact || tzShift) return it.record_id;
+      }
     }
 
     if (!j.data || !j.data.has_more || !j.data.page_token) break;

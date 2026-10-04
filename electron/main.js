@@ -221,7 +221,12 @@ function registerIpc() {
       streak: computeStreak(state),
       config: C
     });
-    state.syncLog.push({ ts: new Date().toISOString(), dateKey: key, ok: r.ok, msg: r.ok ? '同步成功' : (r.reason || '失败') });
+    state.syncLog.push({
+      ts: new Date().toISOString(),
+      dateKey: key,
+      ok: r.ok,
+      msg: r.ok ? (r.mode === 'updated' ? '已更新当日记录' : '已写入新记录') : (r.reason || '失败')
+    });
     S.saveState(state);
     return { result: r, snapshot: snapshot(S.loadState(), C) };
   });
